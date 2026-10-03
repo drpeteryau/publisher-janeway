@@ -36,7 +36,7 @@ PY
     python manage.py build_assets || true
 
     exec gunicorn core.wsgi_coolify:application \
-        --bind 0.0.0.0:8000 \
+        --bind "0.0.0.0:${PORT:?set PORT}" \
         --workers "${GUNICORN_WORKERS:-3}" \
         --timeout "${GUNICORN_TIMEOUT:-120}" \
         --access-logfile - \
