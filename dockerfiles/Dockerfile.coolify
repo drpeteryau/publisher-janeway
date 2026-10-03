@@ -20,6 +20,7 @@ RUN find src/plugins -iname "*requirements.txt" -exec pip install -r {} \; \
     && mkdir -p logs src/media src/collected-static
 
 ENV JANEWAY_SETTINGS_MODULE=core.coolify_settings
+ENV PORT=8000
 EXPOSE 8000
 ENTRYPOINT ["/vol/janeway/dockerfiles/coolify-entrypoint.sh"]
 CMD ["web"]

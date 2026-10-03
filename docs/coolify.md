@@ -1,25 +1,36 @@
 # Deploying Janeway on Coolify behind a Cloudflare Tunnel
 
 `compose.yaml` (repo root) builds `dockerfiles/Dockerfile.coolify` and runs
-Janeway under gunicorn on port 8000 with a Postgres 15 sidecar. The entrypoint
+Janeway under gunicorn on `$PORT` with a Postgres 15 sidecar. The entrypoint
 runs migrations, first-boot install, `collectstatic`, then starts gunicorn.
 Static and media files are served by WhiteNoise, so no nginx is required.
 
 ## Coolify setup
 1. New Resource -> Docker Compose -> this repo, compose file `/compose.yaml`.
 2. Paste the variables from `etc/coolify.env.example` into Environment Variables.
-   `JANEWAY_SECRET_KEY` and `DB_PASSWORD` are required.
+   `PORT`, `JANEWAY_SECRET_KEY` and `DB_PASSWORD` are required.
 3. Deploy.
 
-## Cloudflare Tunnel
-Point the tunnel's Public Hostname (e.g. `journals.example.org`) at the container:
+## Cloudflare Tunnel (PORT pattern, same as the other Coolify apps)
 
-- **cloudflared as a Coolify resource on the same network**: service URL
-  `http://janeway:8000` (use the compose service name; if Coolify suffixes names,
-  use the container name shown in the resource).
-- **Via the Coolify proxy**: assign the domain to the `janeway` service in Coolify
-  (`https://journals.example.org:8000` sets the container port) and point the
-  tunnel at `http://<server-ip>:80`, with "HTTP Host Header" set to the hostname.
+```
+Browser -> Cloudflare -> cloudflared (on the Docker host) -> 127.0.0.1:PORT -> gunicorn in container (0.0.0.0:PORT)
+```
+
+1. Coolify -> Environment Variables: `PORT=<unique port>` (e.g. 9205; gentle-truths
+   uses 9203, night-shift 9204). Compose fails the deploy if `PORT` is unset.
+2. Coolify **Domains: leave empty**. A domain makes Traefik intervene and forward
+   to port 80 -> 502.
+3. Cloudflare Zero Trust -> Tunnels -> Public Hostname: service `HTTP`,
+   `127.0.0.1:<PORT>`.
+4. Verify on the host:
+   `docker ps --format 'table {{.Names}}\t{{.Ports}}' | grep <PORT>` (shows `127.0.0.1:<PORT>->`)
+   and `curl -I http://127.0.0.1:<PORT>`.
+
+`compose.yaml` publishes `127.0.0.1:${PORT}:${PORT}` (loopback only, so the port
+cannot bypass Cloudflare) and gunicorn binds `0.0.0.0:$PORT`.
+`cloudflared` must run on the host (or host network); if it is a container, use
+`host.docker.internal` or share a Docker network and target `http://janeway:<PORT>`.
 
 ## Variables that make the tunnel work
 | Variable | Why |

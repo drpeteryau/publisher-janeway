@@ -1,12 +1,9 @@
 # Coolify deployment (Docker Compose build pack) for Janeway.
 #
-# Traffic path: browser -> Cloudflare -> cloudflared tunnel -> janeway:8000.
-# In Coolify, either:
-#   (a) run cloudflared as a separate Coolify resource on the same network and
-#       point the tunnel's public hostname at  http://janeway:8000 , or
-#   (b) leave the domain on the "janeway" service and point the tunnel at the
-#       Coolify proxy (http://<server>:80).
-# Set all variables below in Coolify -> Environment Variables.
+# Reached through a Cloudflare Tunnel pointing at http://127.0.0.1:${PORT} on the
+# Docker host, so the port is published on loopback only. Leave the Coolify
+# "Domains" field empty (a domain makes Traefik intervene and forward to port 80
+# -> 502). PORT must be unique per app on the same host.
 # See docs/coolify.md.
 
 services:
@@ -15,9 +12,10 @@ services:
       context: .
       dockerfile: dockerfiles/Dockerfile.coolify
     restart: unless-stopped
-    expose:
-      - "8000"
+    ports:
+      - "127.0.0.1:${PORT:?set PORT}:${PORT}"
     environment:
+      - PORT=${PORT:?set PORT}
       - JANEWAY_SETTINGS_MODULE=core.coolify_settings
       - JANEWAY_SECRET_KEY=${JANEWAY_SECRET_KEY:?set JANEWAY_SECRET_KEY}
       - JANEWAY_DEBUG=${JANEWAY_DEBUG:-false}
@@ -62,7 +60,7 @@ services:
       db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "-H", "Host: localhost", "http://127.0.0.1:8000/static/common/css/common.css"]
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "-H", "Host: localhost", "http://127.0.0.1:${PORT}/static/common/css/common.css"]
       interval: 30s
       timeout: 10s
       retries: 5
