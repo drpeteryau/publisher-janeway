@@ -1,0 +1,25 @@
+FROM python:3.10-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential libpq-dev default-libmysqlclient-dev pkg-config \
+        libxml2-dev libxslt1-dev libffi-dev libjpeg-dev zlib1g-dev \
+        gettext curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /vol/janeway
+COPY requirements.txt ./
+RUN pip install -r requirements.txt gunicorn whitenoise
+
+COPY . /vol/janeway
+RUN find src/plugins -iname "*requirements.txt" -exec pip install -r {} \; \
+    && chmod +x dockerfiles/coolify-entrypoint.sh \
+    && mkdir -p logs src/media src/collected-static
+
+ENV JANEWAY_SETTINGS_MODULE=core.coolify_settings
+EXPOSE 8000
+ENTRYPOINT ["/vol/janeway/dockerfiles/coolify-entrypoint.sh"]
+CMD ["web"]

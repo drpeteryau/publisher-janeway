@@ -72,7 +72,7 @@ export JANEWAY_EMAIL_HOST
 export JANEWAY_EMAIL_PORT
 export JANEWAY_EMAIL_USE_TLS
 
-COMPOSE_CMD ?= docker compose
+COMPOSE_CMD ?= docker compose -f docker-compose.yml
 SUFFIX ?= $(shell date +%s)
 SUFFIX := ${SUFFIX}
 DATE := `date +"%y-%m-%d"`
