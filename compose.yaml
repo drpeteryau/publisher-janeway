@@ -4,6 +4,7 @@
 # Docker host, so the port is published on loopback only. Leave the Coolify
 # "Domains" field empty (a domain makes Traefik intervene and forward to port 80
 # -> 502). PORT must be unique per app on the same host.
+# The app healthcheck lives in the Dockerfile.
 # See docs/coolify.md.
 
 services:
@@ -13,7 +14,7 @@ services:
       dockerfile: dockerfiles/Dockerfile.coolify
     restart: unless-stopped
     ports:
-      - "127.0.0.1:${PORT:?set PORT}:${PORT}"
+      - "127.0.0.1:${PORT}:${PORT}"
     environment:
       - PORT=${PORT:?set PORT}
       - JANEWAY_SETTINGS_MODULE=core.coolify_settings
@@ -59,12 +60,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "-H", "Host: localhost", "http://127.0.0.1:${PORT}/static/common/css/common.css"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 120s
 
   db:
     image: postgres:15

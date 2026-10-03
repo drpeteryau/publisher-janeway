@@ -22,5 +22,9 @@ RUN find src/plugins -iname "*requirements.txt" -exec pip install -r {} \; \
 ENV JANEWAY_SETTINGS_MODULE=core.coolify_settings
 ENV PORT=8000
 EXPOSE 8000
+# Static files are served by WhiteNoise before Django's host lookup, so this
+# works regardless of the public hostname. $PORT is expanded at runtime.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=5 \
+    CMD curl -fsS -o /dev/null "http://127.0.0.1:${PORT}/static/common/css/common.css" || exit 1
 ENTRYPOINT ["/vol/janeway/dockerfiles/coolify-entrypoint.sh"]
 CMD ["web"]
