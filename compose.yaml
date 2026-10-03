@@ -1,0 +1,90 @@
+# Coolify deployment (Docker Compose build pack) for Janeway.
+#
+# Traffic path: browser -> Cloudflare -> cloudflared tunnel -> janeway:8000.
+# In Coolify, either:
+#   (a) run cloudflared as a separate Coolify resource on the same network and
+#       point the tunnel's public hostname at  http://janeway:8000 , or
+#   (b) leave the domain on the "janeway" service and point the tunnel at the
+#       Coolify proxy (http://<server>:80).
+# Set all variables below in Coolify -> Environment Variables.
+# See docs/coolify.md.
+
+services:
+  janeway:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.coolify
+    restart: unless-stopped
+    expose:
+      - "8000"
+    environment:
+      - JANEWAY_SETTINGS_MODULE=core.coolify_settings
+      - JANEWAY_SECRET_KEY=${JANEWAY_SECRET_KEY:?set JANEWAY_SECRET_KEY}
+      - JANEWAY_DEBUG=${JANEWAY_DEBUG:-false}
+      # Public hostname(s) served through Cloudflare, comma separated.
+      - JANEWAY_ALLOWED_HOSTS=${JANEWAY_ALLOWED_HOSTS:-*}
+      - JANEWAY_CSRF_TRUSTED_ORIGINS=${JANEWAY_CSRF_TRUSTED_ORIGINS:-}
+      - JANEWAY_DEFAULT_HOST=${JANEWAY_DEFAULT_HOST:-https://www.example.org}
+      - JANEWAY_URL_CONFIG=${JANEWAY_URL_CONFIG:-path}
+      - JANEWAY_SECURE_COOKIES=${JANEWAY_SECURE_COOKIES:-true}
+      - JANEWAY_MEDIA_ROOT=/vol/janeway/src/media
+      - JANEWAY_STATIC_ROOT=/vol/janeway/src/collected-static
+      # Database
+      - DB_VENDOR=postgres
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=${DB_NAME:-janeway}
+      - DB_USER=${DB_USER:-janeway}
+      - DB_PASSWORD=${DB_PASSWORD:?set DB_PASSWORD}
+      # First-boot install (used by install_janeway --use-defaults)
+      - JANEWAY_AUTO_INSTALL=${JANEWAY_AUTO_INSTALL:-true}
+      - JANEWAY_PRESS_NAME=${JANEWAY_PRESS_NAME:-Press}
+      - JANEWAY_PRESS_DOMAIN=${JANEWAY_PRESS_DOMAIN:-localhost}
+      - JANEWAY_PRESS_CONTACT=${JANEWAY_PRESS_CONTACT:-admin@example.org}
+      - JANEWAY_JOURNAL_CODE=${JANEWAY_JOURNAL_CODE:-journal}
+      - JANEWAY_JOURNAL_NAME=${JANEWAY_JOURNAL_NAME:-Journal}
+      - JANEWAY_JOURNAL_DOMAIN=${JANEWAY_JOURNAL_DOMAIN:-}
+      - DJANGO_SUPERUSER_USERNAME=${DJANGO_SUPERUSER_USERNAME:-}
+      - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD:-}
+      - DJANGO_SUPERUSER_EMAIL=${DJANGO_SUPERUSER_EMAIL:-admin@example.org}
+      # Email
+      - JANEWAY_EMAIL_HOST=${JANEWAY_EMAIL_HOST:-}
+      - JANEWAY_EMAIL_PORT=${JANEWAY_EMAIL_PORT:-587}
+      - JANEWAY_EMAIL_HOST_USER=${JANEWAY_EMAIL_HOST_USER:-}
+      - JANEWAY_EMAIL_HOST_PASSWORD=${JANEWAY_EMAIL_HOST_PASSWORD:-}
+      - JANEWAY_EMAIL_USE_TLS=${JANEWAY_EMAIL_USE_TLS:-true}
+      - GUNICORN_WORKERS=${GUNICORN_WORKERS:-3}
+    volumes:
+      - janeway-media:/vol/janeway/src/media
+      - janeway-files:/vol/janeway/src/files
+      - janeway-logs:/vol/janeway/logs
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "-H", "Host: localhost", "http://127.0.0.1:8000/static/common/css/common.css"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  db:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${DB_NAME:-janeway}
+      - POSTGRES_USER=${DB_USER:-janeway}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:?set DB_PASSWORD}
+    volumes:
+      - janeway-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  janeway-db:
+  janeway-media:
+  janeway-files:
+  janeway-logs:
